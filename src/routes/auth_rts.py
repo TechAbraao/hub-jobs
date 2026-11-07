@@ -35,6 +35,16 @@ class FavoriteSchema(Schema):
     job_id = fields.String(required=True)
 
 
+class UpdateUserProfileSchema(Schema):
+    class Meta:
+        unknown = RAISE
+
+    username = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=80))
+    password = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=255))
+    current_username = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=80))
+    current_password = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=255))
+
+
 def _error(message: str, status: int, details: object | None = None):
     body: dict[str, object] = {"error": message}
     if details is not None:
@@ -88,13 +98,29 @@ def login_user():
 @auth_rts.route("/users", methods=["GET"])
 def list_users():
     try:
+        page = int(request.args.get("page", "1"))
+        per_page = int(request.args.get("per_page", "10"))
+    except ValueError:
+        return _error("page e per_page devem ser números válidos.", 400)
+
+    if page < 1 or per_page < 1 or per_page > 100:
+        return _error("page deve ser >= 1 e per_page deve estar entre 1 e 100.", 400)
+
+    query = request.args.get("q")
+    try:
         users = auth_ctr.list_users()
+        if query:
+            term = query.strip().lower()
+            users = [user for user in users if term in (user.username or "").lower()]
+        total = len(users)
+        start = (page - 1) * per_page
+        paginated = users[start:start + per_page]
     except Exception:
         current_app.logger.exception("Failed to list users")
         return _error("Não foi possível consultar os usuários.", 500)
 
     serialized_users = []
-    for user in users:
+    for user in paginated:
         favorite_jobs = list(user.favorite_jobs or []) if user.role != "admin" else []
         serialized_users.append({
             "id": str(user.id),
@@ -103,7 +129,54 @@ def list_users():
             "favorite_jobs": [str(job_id) for job_id in favorite_jobs],
         })
 
-    return jsonify({"users": serialized_users}), 200
+    from math import ceil
+    return jsonify({
+        "users": serialized_users,
+        "pagination": {
+            "page": page,
+            "per_page": per_page,
+            "total": total,
+            "pages": ceil(total / per_page) if total else 1,
+        },
+    }), 200
+
+
+@auth_rts.route("/users/<user_id>", methods=["PATCH", "PUT"])
+@auth_rts.route("/users/<user_id>/profile", methods=["PATCH", "PUT"])
+def update_user_profile_route(user_id: str):
+    body = _json_body()
+    if body is None:
+        return _error("O corpo da requisição deve ser um objeto JSON.", 400)
+
+    try:
+        parsed_user_id = uuid.UUID(str(user_id))
+    except (ValueError, TypeError):
+        return _error("user_id deve ser um UUID válido.", 400)
+
+    try:
+        data = UpdateUserProfileSchema().load(body)
+        if data.get("username") is None and data.get("password") is None:
+            return _error("Informe ao menos um campo para atualizar: username ou password.", 400)
+        updated = auth_ctr.update_user_profile(
+            parsed_user_id,
+            new_username=data.get("username"),
+            current_username=data.get("current_username"),
+            new_password=data.get("password"),
+            current_password=data.get("current_password"),
+        )
+    except ValidationError as error:
+        return _error("Dados inválidos.", 400, validation_details(error))
+    except auth_ctr.UserNotFoundError:
+        return _error("Usuário não encontrado.", 404)
+    except auth_ctr.DuplicateUserError:
+        return _error("Este usuário já existe.", 409)
+    except ValueError as error:
+        return _error(str(error), 400)
+    except Exception:
+        current_app.logger.exception("Failed to update user profile")
+        return _error("Não foi possível atualizar o usuário.", 500)
+
+    return jsonify({"message": "Usuário atualizado com sucesso.", "user": updated.to_dict()}), 200
 
 
 @auth_rts.route("/users/<user_id>", methods=["DELETE"])

@@ -23,6 +23,7 @@ import {
   loginUser,
   registerUser,
   removeFavoriteJob,
+  updateUserProfile,
 } from './src/services/jobsApi';
 
 function normalizeJob(job) {
@@ -73,6 +74,12 @@ export default function App() {
   const [session, setSession] = useState(null);
   const [authLoading, setAuthLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileDraft, setProfileDraft] = useState('');
+  const [profileCurrentPassword, setProfileCurrentPassword] = useState('');
+  const [profileNewPassword, setProfileNewPassword] = useState('');
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
   const [tela, setTela] = useState('Welcome');
   const [vagas, setVagas] = useState([]);
   const [favoritos, setFavoritos] = useState([]);
@@ -97,6 +104,11 @@ export default function App() {
 
   useEffect(() => {
     if (session) {
+      setProfileDraft(session.username || '');
+      setProfileCurrentPassword('');
+      setProfileNewPassword('');
+      setProfileError('');
+      setProfileSuccess('');
       pesquisarNaGupy();
     }
   }, [session]);
@@ -226,6 +238,59 @@ export default function App() {
     setTela('AdminJobs');
   }
 
+  async function handleProfileSave() {
+    const trimmedUsername = (profileDraft || '').trim();
+    const trimmedCurrentPassword = (profileCurrentPassword || '').trim();
+    const trimmedNewPassword = (profileNewPassword || '').trim();
+
+    if (!session?.user?.id) {
+      setProfileError('Sessão inválida. Faça login novamente.');
+      return;
+    }
+
+    if (!trimmedUsername && !trimmedNewPassword) {
+      setProfileError('Informe um novo nome de usuário ou uma nova senha.');
+      return;
+    }
+
+    if (trimmedNewPassword && trimmedCurrentPassword.length < 3) {
+      setProfileError('Informe a senha atual para alterar a senha.');
+      return;
+    }
+
+    try {
+      const updatedUser = await updateUserProfile(session.user.id, {
+        username: trimmedUsername || undefined,
+        current_username: trimmedUsername ? session.username : undefined,
+        password: trimmedNewPassword || undefined,
+        current_password: trimmedNewPassword ? trimmedCurrentPassword : undefined,
+      });
+
+      const successMessage = trimmedNewPassword && trimmedUsername
+        ? 'Nome de usuário e senha atualizados com sucesso.'
+        : trimmedNewPassword
+          ? 'Senha atualizada com sucesso.'
+          : 'Nome de usuário atualizado com sucesso.';
+
+      setSession(prev => ({
+        ...prev,
+        username: updatedUser.username,
+        user: updatedUser,
+      }));
+      await carregarFavoritos(updatedUser.username, session.role);
+      setProfileCurrentPassword('');
+      setProfileNewPassword('');
+      setProfileError('');
+      setProfileSuccess(successMessage);
+      setEditingProfile(false);
+      Alert.alert('Perfil', successMessage);
+    } catch (error) {
+      const message = error.message || 'Não foi possível atualizar o perfil.';
+      setProfileError(message);
+      Alert.alert('Perfil', message);
+    }
+  }
+
   function handleLogout() {
     setSession(null);
     setAuthError('');
@@ -233,6 +298,12 @@ export default function App() {
     setVagas([]);
     setFavoritos([]);
     setVagaSelecionada(null);
+    setEditingProfile(false);
+    setProfileDraft('');
+    setProfileCurrentPassword('');
+    setProfileNewPassword('');
+    setProfileError('');
+    setProfileSuccess('');
   }
 
   function renderizarTela() {
@@ -269,6 +340,17 @@ export default function App() {
             filtros={filtros}
             session={session}
             onLogout={handleLogout}
+            editingProfile={editingProfile}
+            setEditingProfile={setEditingProfile}
+            profileDraft={profileDraft}
+            setProfileDraft={setProfileDraft}
+            profileCurrentPassword={profileCurrentPassword}
+            setProfileCurrentPassword={setProfileCurrentPassword}
+            profileNewPassword={profileNewPassword}
+            setProfileNewPassword={setProfileNewPassword}
+            profileError={profileError}
+            profileSuccess={profileSuccess}
+            onSaveProfile={handleProfileSave}
             paginaAtual={paginaAtual}
             pagination={pagination}
             onPageChange={pagina => pesquisarNaGupy(busca, pagina, filtros)}

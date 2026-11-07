@@ -80,6 +80,48 @@ export async function registerUser({ username, password, role = 'user' }) {
   return response?.user ? { user: response.user } : response;
 }
 
+export async function updateUserProfile(userId, { username, current_username, password, current_password } = {}) {
+  const payload = {};
+
+  if (username !== undefined && username !== null && username !== '') {
+    payload.username = username;
+  }
+  if (password !== undefined && password !== null && password !== '') {
+    payload.password = password;
+  }
+  if (current_username !== undefined && current_username !== null && current_username !== '') {
+    payload.current_username = current_username;
+  }
+  if (current_password !== undefined && current_password !== null && current_password !== '') {
+    payload.current_password = current_password;
+  }
+
+  const response = await request(`/auth/users/${userId}`, {
+    method: 'PATCH',
+    body: payload,
+  });
+
+  return response?.user ?? null;
+}
+
+export async function listUsers(params = {}) {
+  const response = await request('/auth/users', { params });
+
+  if (!response) {
+    return { users: [], pagination: { total: 0, page: 1, per_page: 10, pages: 1 } };
+  }
+
+  const users = (response.users || []).filter(
+    (user) => user.role?.toLowerCase() !== 'admin'
+  );
+
+  return { ...response, users };
+}
+
+export async function deleteUser(userId) {
+  await request(`/auth/users/${userId}`, { method: 'DELETE' });
+}
+
 export async function listFavoriteJobs(username) {
   const response = await request('/auth/favorites', {
     params: { username },

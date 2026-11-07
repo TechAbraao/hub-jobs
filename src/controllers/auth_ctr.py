@@ -54,6 +54,10 @@ def get_user_by_username(username: str) -> UsersMdl | None:
     )
 
 
+def get_user_by_id(user_id: uuid.UUID) -> UsersMdl | None:
+    return database.session.get(UsersMdl, user_id)
+
+
 def create_user(username: str, password: str, *, role: str = "user") -> UsersMdl:
     normalized = _trim_username(username)
     if not normalized:
@@ -78,6 +82,43 @@ def authenticate_user(username: str, password: str) -> UsersMdl:
     user = get_user_by_username(username)
     if user is None or not user.check_password(password):
         raise InvalidCredentialsError
+    return user
+
+
+def update_user_profile(
+    user_id: uuid.UUID,
+    new_username: str | None = None,
+    *,
+    current_username: str | None = None,
+    new_password: str | None = None,
+    current_password: str | None = None,
+) -> UsersMdl:
+    user = get_user_by_id(user_id)
+    if user is None:
+        raise UserNotFoundError
+
+    if current_username is not None and _trim_username(current_username) != user.username:
+        raise ValueError("Você só pode alterar o próprio usuário.")
+
+    if new_username is not None:
+        normalized = _trim_username(new_username)
+        if not normalized:
+            raise ValueError("username is required")
+
+        existing = get_user_by_username(normalized)
+        if existing is not None and existing.id != user.id:
+            raise DuplicateUserError
+        user.username = normalized
+
+    if new_password is not None:
+        password = new_password.strip()
+        if len(password) < 3:
+            raise ValueError("password deve ter no mínimo 3 caracteres.")
+        if current_password is None or not user.check_password(current_password):
+            raise ValueError("Senha atual incorreta.")
+        user.set_password(password)
+
+    database.session.commit()
     return user
 
 

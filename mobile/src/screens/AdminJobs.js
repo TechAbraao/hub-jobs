@@ -11,7 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
-import { createJob, deleteJob, listJobs, updateJob } from '../services/jobsApi';
+import { createJob, deleteJob, deleteUser, listJobs, listUsers, updateJob } from '../services/jobsApi';
+
 
 const EMPTY_FORM = {
   title: '',
@@ -25,29 +26,29 @@ const EMPTY_FORM = {
 
 export default function AdminJobs({ onBack }) {
   const [jobs, setJobs] = useState([]);
+  const [users, setUsers] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editingId, setEditingId] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loadingJobs, setLoadingJobs] = useState(true);
+  const [loadingUsers, setLoadingUsers] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [search, setSearch] = useState('');
+  const [jobSearch, setJobSearch] = useState('');
+  const [userSearch, setUserSearch] = useState('');
   const [activeScreen, setActiveScreen] = useState('form');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    per_page: 10,
-    pages: 1,
-  });
+  const [jobsPage, setJobsPage] = useState(1);
+  const [jobsPagination, setJobsPagination] = useState({ total: 0, page: 1, per_page: 10, pages: 1 });
+  const [usersPage, setUsersPage] = useState(1);
+  const [usersPagination, setUsersPagination] = useState({ total: 0, page: 1, per_page: 10, pages: 1 });
 
   async function loadJobs(term = '', page = 1) {
     try {
-      setLoading(true);
+      setLoadingJobs(true);
       const response = await listJobs({ page, per_page: 10, q: term || undefined });
       setJobs(response.jobs || []);
-      setCurrentPage(Number(response?.pagination?.page || page));
-      setPagination(response?.pagination || {
+      setJobsPage(Number(response?.pagination?.page || page));
+      setJobsPagination(response?.pagination || {
         total: response.jobs?.length || 0,
         page,
         per_page: 10,
@@ -57,12 +58,34 @@ export default function AdminJobs({ onBack }) {
     } catch (err) {
       setError(err.message || 'Não foi possível carregar as vagas.');
     } finally {
-      setLoading(false);
+      setLoadingJobs(false);
+    }
+  }
+
+  async function loadUsers(term = '', page = 1) {
+    try {
+      setLoadingUsers(true);
+      const response = await listUsers({ page, per_page: 10, q: term || undefined });
+      setUsers(response.users || []);
+      setUsersPage(Number(response?.pagination?.page || page));
+      setUsersPagination(response?.pagination || {
+        total: response.users?.length || 0,
+        page,
+        per_page: 10,
+        pages: 1,
+      });
+      setError('');
+    } catch (err) {
+      setError(err.message || 'Não foi possível carregar os usuários.');
+    } finally {
+      setLoadingUsers(false);
     }
   }
 
   useEffect(() => {
+    document.title = "HubJobs | Administrativo";
     loadJobs();
+    loadUsers();
   }, []);
 
   function updateField(field, value) {
@@ -80,10 +103,18 @@ export default function AdminJobs({ onBack }) {
     setSuccess('');
   }
 
-  function openListScreen() {
-    setActiveScreen('list');
+  function openJobsListScreen() {
+    setActiveScreen('jobs');
     setError('');
     setSuccess('');
+    loadJobs(jobSearch, 1);
+  }
+
+  function openUsersListScreen() {
+    setActiveScreen('users');
+    setError('');
+    setSuccess('');
+    loadUsers(userSearch, 1);
   }
 
   async function handleSubmit() {
@@ -118,9 +149,9 @@ export default function AdminJobs({ onBack }) {
         await createJob(payload);
         setSuccess('Vaga criada com sucesso.');
       }
-      await loadJobs(search, 1);
+      await loadJobs(jobSearch, 1);
       resetForm();
-      setActiveScreen('list');
+      setActiveScreen('jobs');
     } catch (err) {
       setError(err.message || 'Não foi possível salvar essa vaga.');
     } finally {
@@ -164,11 +195,38 @@ export default function AdminJobs({ onBack }) {
       setSuccess('');
       await deleteJob(id);
       setJobs(current => current.filter(item => String(item.id) !== String(id)));
-      await loadJobs(search, currentPage);
+      await loadJobs(jobSearch, jobsPage);
       setSuccess('Vaga removida com sucesso.');
     } catch (err) {
       console.warn('Erro ao excluir:', err);
       setError(err.message || 'Não foi possível excluir a vaga.');
+    }
+  }
+
+  async function handleDeleteUser(user) {
+    const id = user?.id;
+
+    if (id === undefined || id === null || id === '') {
+      setError('Não foi possível identificar o usuário para exclusão.');
+      return;
+    }
+
+    const confirmed = await confirmDialog(
+      'Remover usuário',
+      `Deseja excluir o usuário "${user.username || 'este usuário'}"?`,
+    );
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setSuccess('');
+      await deleteUser(id);
+      setUsers(current => current.filter(item => String(item.id) !== String(id)));
+      await loadUsers(userSearch, usersPage);
+      setSuccess('Usuário removido com sucesso.');
+    } catch (err) {
+      console.warn('Erro ao excluir usuário:', err);
+      setError(err.message || 'Não foi possível excluir o usuário.');
     }
   }
 
@@ -254,7 +312,7 @@ export default function AdminJobs({ onBack }) {
             <Text style={styles.secondaryButtonText}>Cancelar</Text>
           </TouchableOpacity>
         ) : (
-          <TouchableOpacity style={styles.secondaryButton} onPress={openListScreen}>
+          <TouchableOpacity style={styles.secondaryButton} onPress={openJobsListScreen}>
             <Text style={styles.secondaryButtonText}>Ver vagas</Text>
           </TouchableOpacity>
         )}
@@ -262,7 +320,7 @@ export default function AdminJobs({ onBack }) {
     </View>
   );
 
-  const renderListScreen = () => (
+  const renderJobsListScreen = () => (
     <>
       <View style={styles.listHeader}>
         <View style={styles.listHeaderRow}>
@@ -273,9 +331,9 @@ export default function AdminJobs({ onBack }) {
         </View>
 
         <TextInput
-          value={search}
+          value={jobSearch}
           onChangeText={async value => {
-            setSearch(value);
+            setJobSearch(value);
             await loadJobs(value, 1);
           }}
           placeholder="Buscar por título ou empresa"
@@ -286,7 +344,7 @@ export default function AdminJobs({ onBack }) {
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
       {success ? <Text style={styles.successText}>{success}</Text> : null}
 
-      {loading ? (
+      {loadingJobs ? (
         <Text style={styles.emptyState}>Carregando vagas...</Text>
       ) : jobs.length === 0 ? (
         <Text style={styles.emptyState}>Nenhuma vaga cadastrada ainda.</Text>
@@ -317,24 +375,97 @@ export default function AdminJobs({ onBack }) {
             </View>
           ))}
 
-          {pagination.pages > 1 && (
+          {jobsPagination.pages > 1 && (
             <View style={styles.paginationRow}>
               <TouchableOpacity
-                style={[styles.paginationButton, currentPage <= 1 && styles.paginationButtonDisabled]}
-                onPress={() => currentPage > 1 && loadJobs(search, currentPage - 1)}
-                disabled={currentPage <= 1}
+                style={[styles.paginationButton, jobsPage <= 1 && styles.paginationButtonDisabled]}
+                onPress={() => jobsPage > 1 && loadJobs(jobSearch, jobsPage - 1)}
+                disabled={jobsPage <= 1}
               >
-                <Text style={[styles.paginationButtonText, currentPage <= 1 && styles.paginationButtonTextDisabled]}>Anterior</Text>
+                <Text style={[styles.paginationButtonText, jobsPage <= 1 && styles.paginationButtonTextDisabled]}>Anterior</Text>
               </TouchableOpacity>
 
-              <Text style={styles.paginationLabel}>Página {currentPage} / {pagination.pages}</Text>
+              <Text style={styles.paginationLabel}>Página {jobsPage} / {jobsPagination.pages}</Text>
 
               <TouchableOpacity
-                style={[styles.paginationButton, currentPage >= pagination.pages && styles.paginationButtonDisabled]}
-                onPress={() => currentPage < pagination.pages && loadJobs(search, currentPage + 1)}
-                disabled={currentPage >= pagination.pages}
+                style={[styles.paginationButton, jobsPage >= jobsPagination.pages && styles.paginationButtonDisabled]}
+                onPress={() => jobsPage < jobsPagination.pages && loadJobs(jobSearch, jobsPage + 1)}
+                disabled={jobsPage >= jobsPagination.pages}
               >
-                <Text style={[styles.paginationButtonText, currentPage >= pagination.pages && styles.paginationButtonTextDisabled]}>Próxima</Text>
+                <Text style={[styles.paginationButtonText, jobsPage >= jobsPagination.pages && styles.paginationButtonTextDisabled]}>Próxima</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
+      )}
+    </>
+  );
+
+  const renderUsersListScreen = () => (
+    <>
+      <View style={styles.listHeader}>
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.sectionTitle}>Usuários cadastrados</Text>
+        </View>
+
+        <TextInput
+          value={userSearch}
+          onChangeText={async value => {
+            setUserSearch(value);
+            await loadUsers(value, 1);
+          }}
+          placeholder="Buscar por usuário"
+          style={styles.searchInput}
+        />
+      </View>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+      {success ? <Text style={styles.successText}>{success}</Text> : null}
+
+      {loadingUsers ? (
+        <Text style={styles.emptyState}>Carregando usuários...</Text>
+      ) : users.length === 0 ? (
+        <Text style={styles.emptyState}>Nenhum usuário cadastrado ainda.</Text>
+      ) : (
+        <>
+          {users.map(user => (
+            <View key={user.id} style={styles.jobCard}>
+              <View style={styles.jobHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.jobTitle}>{user.username}</Text>
+                  <Text style={styles.jobMeta}>{user.role === 'admin' ? 'Administrador' : 'Usuário'}</Text>
+                </View>
+
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => handleDeleteUser(user)} style={styles.iconButton}>
+                    <Ionicons name="trash-outline" size={18} color="#C23616" />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <Text style={styles.jobText}>Favoritos: {Array.isArray(user.favorite_jobs) ? user.favorite_jobs.length : 0}</Text>
+              <Text style={styles.jobText}>ID: {user.id}</Text>
+            </View>
+          ))}
+
+          {usersPagination.pages > 1 && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.paginationButton, usersPage <= 1 && styles.paginationButtonDisabled]}
+                onPress={() => usersPage > 1 && loadUsers(userSearch, usersPage - 1)}
+                disabled={usersPage <= 1}
+              >
+                <Text style={[styles.paginationButtonText, usersPage <= 1 && styles.paginationButtonTextDisabled]}>Anterior</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.paginationLabel}>Página {usersPage} / {usersPagination.pages}</Text>
+
+              <TouchableOpacity
+                style={[styles.paginationButton, usersPage >= usersPagination.pages && styles.paginationButtonDisabled]}
+                onPress={() => usersPage < usersPagination.pages && loadUsers(userSearch, usersPage + 1)}
+                disabled={usersPage >= usersPagination.pages}
+              >
+                <Text style={[styles.paginationButtonText, usersPage >= usersPagination.pages && styles.paginationButtonTextDisabled]}>Próxima</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -368,16 +499,25 @@ export default function AdminJobs({ onBack }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, activeScreen === 'list' && styles.activeTabButton]}
-            onPress={openListScreen}
+            style={[styles.tabButton, activeScreen === 'jobs' && styles.activeTabButton]}
+            onPress={openJobsListScreen}
           >
-            <Text style={[styles.tabButtonText, activeScreen === 'list' && styles.activeTabButtonText]}>
-              Vagas Cadastradas
+            <Text style={[styles.tabButtonText, activeScreen === 'jobs' && styles.activeTabButtonText]}>
+              Todas as Vagas
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tabButton, activeScreen === 'users' && styles.activeTabButton]}
+            onPress={openUsersListScreen}
+          >
+            <Text style={[styles.tabButtonText, activeScreen === 'users' && styles.activeTabButtonText]}>
+              Usuários
             </Text>
           </TouchableOpacity>
         </View>
 
-        {activeScreen === 'form' ? renderFormScreen() : renderListScreen()}
+        {activeScreen === 'form' ? renderFormScreen() : activeScreen === 'jobs' ? renderJobsListScreen() : renderUsersListScreen()}
       </ScrollView>
     </SafeAreaView>
   );
@@ -447,16 +587,15 @@ const styles = StyleSheet.create({
     minHeight: 120,
   },
   buttonRow: {
-    flexDirection: 'row',
-    marginTop: 8,
+    flexDirection: 'column',
     alignItems: 'center',
   },
   primaryButton: {
-    flex: 1,
     backgroundColor: '#1647C5',
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
+    width: '100%',
   },
   primaryButtonText: {
     color: '#FFFFFF',
@@ -464,11 +603,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   secondaryButton: {
-    marginLeft: 8,
     backgroundColor: '#EAF0FD',
     paddingVertical: 12,
-    paddingHorizontal: 18,
     borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+    marginTop: 5,
   },
   secondaryButtonText: {
     color: '#1647C5',
@@ -510,7 +650,7 @@ const styles = StyleSheet.create({
   tabButtonText: {
     color: '#0D2347',
     fontWeight: '700',
-    fontSize: 13,
+    fontSize: 12,
   },
   activeTabButtonText: {
     color: '#FFFFFF',

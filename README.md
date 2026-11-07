@@ -217,6 +217,7 @@ Exemplo de payload para criar vaga:
 | `POST` | `/auth/register` | Cadastra um usuário. |
 | `POST` | `/auth/login` | Autentica e retorna o perfil. |
 | `GET` | `/auth/users` | Lista usuários e seus UUIDs de vagas favoritadas. |
+| `PATCH` | `/auth/users/<userId>` | Atualiza o nome do usuário autenticado pelo UUID. |
 | `DELETE` | `/auth/users/<userId>` | Remove um usuário pelo UUID. |
 | `GET` | `/auth/favorites?username=<username>` | Lista as vagas favoritadas do usuário. |
 | `POST` | `/auth/favorites` | Adiciona uma vaga aos favoritos. |

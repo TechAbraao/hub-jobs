@@ -220,6 +220,69 @@ def test_create_rejects_invalid_payloads(client, body):
     assert "error" in response.get_json()
 
 
+def test_user_can_update_its_own_username(client):
+    register = client.post("/auth/register", json={"username": "alice", "password": "secret123"})
+    user_id = register.get_json()["user"]["id"]
+
+    response = client.patch(f"/auth/users/{user_id}", json={"username": "alice_updated", "current_username": "alice"})
+
+    assert response.status_code == 200
+    assert response.get_json()["user"]["username"] == "alice_updated"
+    assert client.post("/auth/login", json={"username": "alice_updated", "password": "secret123"}).status_code == 200
+
+
+def test_user_update_rejects_duplicate_or_mismatched_username(client):
+    alice = client.post("/auth/register", json={"username": "alice", "password": "secret123"})
+    bob = client.post("/auth/register", json={"username": "bob", "password": "secret456"})
+    alice_id = alice.get_json()["user"]["id"]
+    bob_id = bob.get_json()["user"]["id"]
+
+    duplicate = client.patch(f"/auth/users/{alice_id}", json={"username": "bob", "current_username": "alice"})
+    assert duplicate.status_code == 409
+
+    mismatch = client.patch(f"/auth/users/{alice_id}", json={"username": "alice-renamed", "current_username": "bob"})
+    assert mismatch.status_code == 400
+
+    same_user = client.patch(f"/auth/users/{bob_id}", json={"username": "bob-updated"})
+    assert same_user.status_code == 200
+
+
+def test_user_can_update_password(client):
+    response = client.post("/auth/register", json={"username": "carol", "password": "initial123"})
+    user_id = response.get_json()["user"]["id"]
+
+    updated = client.patch(
+        f"/auth/users/{user_id}",
+        json={
+            "password": "updated456",
+            "current_password": "initial123",
+            "current_username": "carol",
+        },
+    )
+
+    assert updated.status_code == 200
+    assert client.post("/auth/login", json={"username": "carol", "password": "updated456"}).status_code == 200
+
+
+def test_list_users_supports_pagination_and_search(client):
+    client.post("/auth/register", json={"username": "alice", "password": "secret123"})
+    client.post("/auth/register", json={"username": "bob", "password": "secret456"})
+    client.post("/auth/register", json={"username": "charlie", "password": "secret789"})
+
+    response = client.get("/auth/users?page=2&per_page=2")
+    searched = client.get("/auth/users?q=ali")
+
+    assert response.status_code == 200
+    assert searched.status_code == 200
+    body = response.get_json()
+    assert body["pagination"]["page"] == 2
+    assert body["pagination"]["per_page"] == 2
+    assert body["pagination"]["total"] == 4
+    assert body["pagination"]["pages"] == 2
+    assert [user["username"] for user in body["users"]] == ["bob", "charlie"]
+    assert [user["username"] for user in searched.get_json()["users"]] == ["alice"]
+
+
 @pytest.mark.parametrize(
     "changes",
     [

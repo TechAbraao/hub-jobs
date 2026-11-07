@@ -1,0 +1,30 @@
+meta {
+  name: Update User Profile
+  type: http
+  seq: 5
+}
+
+patch {
+  url: {{baseUrl}}/auth/users/{{userId}}
+  body: json
+  auth: none
+}
+
+headers {
+  Accept: application/json
+  Content-Type: application/json
+}
+
+body:json {
+  {
+    "username": "{{username}}",
+    "current_username": "{{currentUsername}}"
+  }
+}
+
+vars:pre-request {
+  baseUrl: http://127.0.0.1:5000
+  userId: 00000000-0000-0000-0000-000000000000
+  username: alice_updated
+  currentUsername: alice
+}

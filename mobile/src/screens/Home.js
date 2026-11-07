@@ -31,6 +31,17 @@ export default function Home({
   filtros,
   session,
   onLogout,
+  editingProfile = false,
+  setEditingProfile,
+  profileDraft = '',
+  setProfileDraft,
+  profileCurrentPassword = '',
+  setProfileCurrentPassword,
+  profileNewPassword = '',
+  setProfileNewPassword,
+  profileError = '',
+  profileSuccess = '',
+  onSaveProfile,
   paginaAtual = 1,
   pagination = { total: 0, page: 1, per_page: 10, pages: 0 },
   onPageChange,
@@ -100,12 +111,95 @@ export default function Home({
             </Text>
           </View>
 
-          {onLogout ? (
-            <TouchableOpacity onPress={onLogout} style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#E8ECF5' }}>
-              <Text style={{ color: '#082347', fontSize: 11, fontWeight: '700' }}>Sair</Text>
-            </TouchableOpacity>
-          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            {setEditingProfile ? (
+              <TouchableOpacity
+                onPress={() => setEditingProfile(true)}
+                style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#EAF1FF', marginRight: 8 }}
+              >
+                <Text style={{ color: '#082347', fontSize: 11, fontWeight: '700' }}>Perfil</Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {onLogout ? (
+              <TouchableOpacity onPress={onLogout} style={{ paddingVertical: 6, paddingHorizontal: 10, borderRadius: 8, backgroundColor: '#E8ECF5' }}>
+                <Text style={{ color: '#082347', fontSize: 11, fontWeight: '700' }}>Sair</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
         </View>
+
+        {editingProfile ? (
+          <View style={{ marginTop: 12, backgroundColor: '#FFFFFF', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#DBE3F1' }}>
+            <Text style={{ color: '#1D3C75', fontSize: 12, fontWeight: '700', marginBottom: 8 }}>Editar perfil</Text>
+            <TextInput
+              value={profileDraft}
+              onChangeText={setProfileDraft}
+              placeholder="Novo nome de usuário"
+              style={[
+                { backgroundColor: '#F4F7FF', borderRadius: 10, paddingHorizontal: 12, height: 42, color: '#122B4E', marginBottom: 8 },
+                session?.role === 'admin' && { opacity: 0.5, color: '#8A94A6', pointerEvents: 'none' }
+              ]}
+            />
+            <TextInput
+              value={profileCurrentPassword}
+              onChangeText={setProfileCurrentPassword}
+              placeholder="Senha atual"
+              secureTextEntry
+              style={[
+                {
+                  backgroundColor: '#F4F7FF',
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  height: 42,
+                  color: '#122B4E',
+                  marginBottom: 8,
+                },
+                session?.role === 'admin' && { opacity: 0.5, color: '#8A94A6', pointerEvents: 'none' },
+              ]}
+            />
+            <TextInput
+              value={profileNewPassword}
+              onChangeText={setProfileNewPassword}
+              placeholder="Nova senha"
+              secureTextEntry
+              style={[
+                {
+                  backgroundColor: '#F4F7FF',
+                  borderRadius: 10,
+                  paddingHorizontal: 12,
+                  height: 42,
+                  color: '#122B4E',
+                  marginBottom: 8,
+                },
+                session?.role === 'admin' && { opacity: 0.5, color: '#8A94A6', pointerEvents: 'none' },
+              ]}
+            />
+
+            {profileError ? (
+              <Text style={{ color: '#B42318', fontSize: 11, marginTop: 8 }}>{profileError}</Text>
+            ) : null}
+            {profileSuccess ? (
+              <Text style={{ color: '#067647', fontSize: 11, marginTop: 8 }}>{profileSuccess}</Text>
+            ) : null}
+
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 10 }}>
+              <TouchableOpacity onPress={() => {
+                setEditingProfile(false);
+                setProfileError('');
+                setProfileSuccess('');
+              }} style={{ paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: '#EEF2F9', marginRight: 8 }}>
+                <Text style={{ color: '#203862', fontWeight: '700', fontSize: 11 }}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={onSaveProfile} style={[
+                { paddingVertical: 8, paddingHorizontal: 12, borderRadius: 8, backgroundColor: BLUE },
+              session?.role === 'admin' && { opacity: 0.5, pointerEvents: 'none' }]
+            }>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 11 }}>Salvar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
 
         <Text style={{ color: '#1D3C75', fontSize: 18, marginTop: 6 }}>
           Encontre sua vaga

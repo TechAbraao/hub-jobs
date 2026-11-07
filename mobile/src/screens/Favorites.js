@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   SafeAreaView,
   View,
@@ -19,6 +19,13 @@ export default function Favorites({
   abrirDetalhes,
   voltar,
 }) {
+
+
+  useEffect(() => {
+    document.title = "HubJobs | Favoritos";
+  }, []);
+
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F3F6FC' }}>
       <View style={{ flex: 1, padding: 14 }}>
