@@ -31,14 +31,20 @@ export default function Home({
   filtros,
   session,
   onLogout,
+  paginaAtual = 1,
+  pagination = { total: 0, page: 1, per_page: 10, pages: 0 },
+  onPageChange,
 }) {
   const canManageFavorites = session?.role !== 'admin';
+
+  useEffect(() => {
+    if (typeof document !== 'undefined') {
+      document.title = 'HubJobs | Vagas';
+    }
+  }, []);
+
   const filtradas = vagas.filter(vaga => {
     const termo = busca.toLowerCase();
-
-    useEffect(() => {
-      document.title = "HubJobs | Vagas";
-    }, []);
 
     const correspondeBusca =
       vaga.cargo.toLowerCase().includes(termo) ||
@@ -198,6 +204,46 @@ export default function Home({
             onFavorite={canManageFavorites ? () => alternarFavorito(vaga) : undefined}
           />
         ))}
+
+        {pagination.pages > 1 && (
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 18, marginBottom: 4 }}>
+            <TouchableOpacity
+              onPress={() => onPageChange?.(Math.max(1, paginaAtual - 1))}
+              disabled={paginaAtual <= 1 || !onPageChange}
+              style={{
+                flex: 1,
+                backgroundColor: paginaAtual <= 1 ? '#E7EBF4' : '#1647C5',
+                paddingVertical: 10,
+                borderRadius: 10,
+                marginRight: 8,
+              }}
+            >
+              <Text style={{ textAlign: 'center', color: paginaAtual <= 1 ? '#7A8698' : '#FFFFFF', fontWeight: '700' }}>
+                Anterior
+              </Text>
+            </TouchableOpacity>
+
+            <Text style={{ alignSelf: 'center', color: '#364B73', fontSize: 12, fontWeight: '700' }}>
+              Página {paginaAtual} / {pagination.pages}
+            </Text>
+
+            <TouchableOpacity
+              onPress={() => onPageChange?.(Math.min(pagination.pages, paginaAtual + 1))}
+              disabled={paginaAtual >= pagination.pages || !onPageChange}
+              style={{
+                flex: 1,
+                backgroundColor: paginaAtual >= pagination.pages ? '#E7EBF4' : '#1647C5',
+                paddingVertical: 10,
+                borderRadius: 10,
+                marginLeft: 8,
+              }}
+            >
+              <Text style={{ textAlign: 'center', color: paginaAtual >= pagination.pages ? '#7A8698' : '#FFFFFF', fontWeight: '700' }}>
+                Próxima
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {filtradas.length === 0 && (
           <Text style={{ textAlign: 'center', color: '#8792A6', marginTop: 30 }}>

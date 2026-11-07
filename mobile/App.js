@@ -79,6 +79,13 @@ export default function App() {
   const [vagaSelecionada, setVagaSelecionada] = useState(null);
   const [busca, setBusca] = useState('');
   const [categoria, setCategoria] = useState('Todas');
+  const [paginaAtual, setPaginaAtual] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    per_page: 10,
+    pages: 0,
+  });
 
   const [filtros, setFiltros] = useState({
     modalidade: '',
@@ -142,23 +149,37 @@ export default function App() {
     }
   }
 
-  async function pesquisarNaGupy(termo = busca) {
+  async function pesquisarNaGupy(termo = busca, pagina = 1, filtrosAtuais = filtros) {
     if (!session) {
       return;
     }
 
     try {
-      const params = { q: termo || undefined };
+      const params = {
+        page: pagina,
+        per_page: 10,
+        q: termo || undefined,
+      };
 
-      if (filtros?.localizacao) {
-        params.location = filtros.localizacao;
+      if (filtrosAtuais?.localizacao) {
+        params.location = filtrosAtuais.localizacao;
       }
 
       const response = await listJobs(params);
-      setVagas(normalizeJobs(response.jobs || []));
+      const jobs = normalizeJobs(response.jobs || []);
+      setVagas(jobs);
+      setPaginaAtual(Number(response?.pagination?.page || pagina));
+      setPagination(response?.pagination || {
+        total: jobs.length,
+        page: pagina,
+        per_page: 10,
+        pages: 1,
+      });
     } catch (error) {
       console.log('Erro na busca:', error.message);
       setVagas([]);
+      setPagination({ total: 0, page: 1, per_page: 10, pages: 0 });
+      setPaginaAtual(1);
     }
   }
 
@@ -248,6 +269,9 @@ export default function App() {
             filtros={filtros}
             session={session}
             onLogout={handleLogout}
+            paginaAtual={paginaAtual}
+            pagination={pagination}
+            onPageChange={pagina => pesquisarNaGupy(busca, pagina, filtros)}
           />
         );
 
@@ -258,7 +282,9 @@ export default function App() {
             onBack={voltarParaHome}
             onApply={novosFiltros => {
               setFiltros(novosFiltros);
+              setPaginaAtual(1);
               setTela('Home');
+              pesquisarNaGupy(busca, 1, novosFiltros);
             }}
           />
         );
@@ -293,6 +319,9 @@ export default function App() {
               filtros={filtros}
               session={session}
               onLogout={handleLogout}
+              paginaAtual={paginaAtual}
+              pagination={pagination}
+              onPageChange={pagina => pesquisarNaGupy(busca, pagina, filtros)}
             />
           );
         }

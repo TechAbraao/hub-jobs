@@ -33,12 +33,26 @@ export default function AdminJobs({ onBack }) {
   const [success, setSuccess] = useState('');
   const [search, setSearch] = useState('');
   const [activeScreen, setActiveScreen] = useState('form');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pagination, setPagination] = useState({
+    total: 0,
+    page: 1,
+    per_page: 10,
+    pages: 1,
+  });
 
-  async function loadJobs(term = '') {
+  async function loadJobs(term = '', page = 1) {
     try {
       setLoading(true);
-      const response = await listJobs({ page: 1, per_page: 50, q: term || undefined });
+      const response = await listJobs({ page, per_page: 10, q: term || undefined });
       setJobs(response.jobs || []);
+      setCurrentPage(Number(response?.pagination?.page || page));
+      setPagination(response?.pagination || {
+        total: response.jobs?.length || 0,
+        page,
+        per_page: 10,
+        pages: 1,
+      });
       setError('');
     } catch (err) {
       setError(err.message || 'Não foi possível carregar as vagas.');
@@ -104,7 +118,7 @@ export default function AdminJobs({ onBack }) {
         await createJob(payload);
         setSuccess('Vaga criada com sucesso.');
       }
-      await loadJobs(search);
+      await loadJobs(search, 1);
       resetForm();
       setActiveScreen('list');
     } catch (err) {
@@ -150,7 +164,7 @@ export default function AdminJobs({ onBack }) {
       setSuccess('');
       await deleteJob(id);
       setJobs(current => current.filter(item => String(item.id) !== String(id)));
-      await loadJobs(search);
+      await loadJobs(search, currentPage);
       setSuccess('Vaga removida com sucesso.');
     } catch (err) {
       console.warn('Erro ao excluir:', err);
@@ -262,7 +276,7 @@ export default function AdminJobs({ onBack }) {
           value={search}
           onChangeText={async value => {
             setSearch(value);
-            await loadJobs(value);
+            await loadJobs(value, 1);
           }}
           placeholder="Buscar por título ou empresa"
           style={styles.searchInput}
@@ -277,30 +291,54 @@ export default function AdminJobs({ onBack }) {
       ) : jobs.length === 0 ? (
         <Text style={styles.emptyState}>Nenhuma vaga cadastrada ainda.</Text>
       ) : (
-        jobs.map(job => (
-          <View key={job.id} style={styles.jobCard}>
-            <View style={styles.jobHeader}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.jobTitle}>{job.title}</Text>
-                <Text style={styles.jobMeta}>{job.company}</Text>
+        <>
+          {jobs.map(job => (
+            <View key={job.id} style={styles.jobCard}>
+              <View style={styles.jobHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.jobTitle}>{job.title}</Text>
+                  <Text style={styles.jobMeta}>{job.company}</Text>
+                </View>
+
+                <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => handleEdit(job)} style={styles.iconButton}>
+                    <Ionicons name="create-outline" size={18} color="#0D2347" />
+                  </TouchableOpacity>
+                  <TouchableOpacity onPress={() => handleDelete(job)} style={styles.iconButton}>
+                    <Ionicons name="trash-outline" size={18} color="#C23616" />
+                  </TouchableOpacity>
+                </View>
               </View>
 
-              <View style={styles.actions}>
-                <TouchableOpacity onPress={() => handleEdit(job)} style={styles.iconButton}>
-                  <Ionicons name="create-outline" size={18} color="#0D2347" />
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => handleDelete(job)} style={styles.iconButton}>
-                  <Ionicons name="trash-outline" size={18} color="#C23616" />
-                </TouchableOpacity>
-              </View>
+              <Text style={styles.jobText}>{job.location}</Text>
+              <Text style={styles.jobText}>{job.platform}</Text>
+              {job.salary != null ? <Text style={styles.jobSalary}>R$ {Number(job.salary).toLocaleString('pt-BR')}</Text> : null}
+              <Text numberOfLines={3} style={styles.jobDescription}>{job.description}</Text>
             </View>
+          ))}
 
-            <Text style={styles.jobText}>{job.location}</Text>
-            <Text style={styles.jobText}>{job.platform}</Text>
-            {job.salary != null ? <Text style={styles.jobSalary}>R$ {Number(job.salary).toLocaleString('pt-BR')}</Text> : null}
-            <Text numberOfLines={3} style={styles.jobDescription}>{job.description}</Text>
-          </View>
-        ))
+          {pagination.pages > 1 && (
+            <View style={styles.paginationRow}>
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage <= 1 && styles.paginationButtonDisabled]}
+                onPress={() => currentPage > 1 && loadJobs(search, currentPage - 1)}
+                disabled={currentPage <= 1}
+              >
+                <Text style={[styles.paginationButtonText, currentPage <= 1 && styles.paginationButtonTextDisabled]}>Anterior</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.paginationLabel}>Página {currentPage} / {pagination.pages}</Text>
+
+              <TouchableOpacity
+                style={[styles.paginationButton, currentPage >= pagination.pages && styles.paginationButtonDisabled]}
+                onPress={() => currentPage < pagination.pages && loadJobs(search, currentPage + 1)}
+                disabled={currentPage >= pagination.pages}
+              >
+                <Text style={[styles.paginationButtonText, currentPage >= pagination.pages && styles.paginationButtonTextDisabled]}>Próxima</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </>
       )}
     </>
   );
@@ -559,6 +597,37 @@ const styles = StyleSheet.create({
     color: '#4E607A',
     fontSize: 12,
     lineHeight: 18,
+  },
+  paginationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  paginationButton: {
+    flex: 1,
+    backgroundColor: '#1647C5',
+    paddingVertical: 10,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#E7EBF4',
+  },
+  paginationButtonText: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  paginationButtonTextDisabled: {
+    color: '#7A8698',
+  },
+  paginationLabel: {
+    fontSize: 12,
+    color: '#364B73',
+    fontWeight: '700',
+    marginHorizontal: 8,
   },
   emptyState: {
     textAlign: 'center',
