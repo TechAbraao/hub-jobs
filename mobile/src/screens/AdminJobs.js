@@ -203,6 +203,34 @@ export default function AdminJobs({ onBack }) {
     }
   }
 
+  async function handleIsActivedUser(user) {
+    const id = user?.id;
+
+    if (id === undefined || id === null || id === '') {
+      setError('Não foi possível identificar o usuário para ativação/desativação.');
+      return;
+    }
+
+    const confirmed = await confirmDialog(
+      'Ativar/Desativar usuário',
+      `Deseja ativar/desativar o usuário "${user.username || 'este usuário'}"?`,
+    );
+
+    if (!confirmed) return;
+
+    try {
+      setError('');
+      setSuccess('');
+      await None
+      setUsers(current => current.filter(item => String(item.id) !== String(id)));
+      await loadUsers(userSearch, usersPage);
+      setSuccess('Usuário ativado/desativado com sucesso.');
+    } catch (err) {
+      console.warn('Erro ao ativar/desativar usuário:', err);
+      setError(err.message || 'Não foi possível ativar/desativar o usuário.');
+    }
+  }
+
   async function handleDeleteUser(user) {
     const id = user?.id;
 
@@ -437,14 +465,23 @@ export default function AdminJobs({ onBack }) {
                 </View>
 
                 <View style={styles.actions}>
+                  <TouchableOpacity onPress={() => handleIsActivedUser(user)} style={styles.iconButton}>
+                    <Ionicons name="checkbox" size={18} color="#1621c2" />
+                  </TouchableOpacity>
+                </View>
+
+                <View style={styles.actions}>
                   <TouchableOpacity onPress={() => handleDeleteUser(user)} style={styles.iconButton}>
                     <Ionicons name="trash-outline" size={18} color="#C23616" />
                   </TouchableOpacity>
                 </View>
+
               </View>
 
               <Text style={styles.jobText}>Favoritos: {Array.isArray(user.favorite_jobs) ? user.favorite_jobs.length : 0}</Text>
               <Text style={styles.jobText}>ID: {user.id}</Text>
+              {/** Adicionar uma personalização se caso for TRUE ou FALSE no status do usuário */}
+              <Text style={styles.jobText}>Status: {user.is_active}</Text>
             </View>
           ))}
 

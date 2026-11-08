@@ -5,13 +5,13 @@ meta {
 }
 
 get {
-  url: {{baseUrl}}/jobs?page=1&per_page=20
+  url: {{baseUrl}}/jobs?q=
+  body: none
   auth: none
 }
 
-query {
-  page: 1
-  per_page: 20
+params:query {
+  q: 
 }
 
 headers {

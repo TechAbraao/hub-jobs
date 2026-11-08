@@ -84,6 +84,14 @@ def authenticate_user(username: str, password: str) -> UsersMdl:
         raise InvalidCredentialsError
     return user
 
+def update_user_is_active(user_id: uuid.UUID, is_active: bool) -> UsersMdl:
+    user = get_user_by_id(user_id)
+    if user is None:
+        raise UserNotFoundError
+
+    user.is_active = is_active
+    database.session.commit()
+    return user
 
 def update_user_profile(
     user_id: uuid.UUID,

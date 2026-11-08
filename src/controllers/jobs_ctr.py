@@ -52,6 +52,7 @@ def list_jobs(
 		count_statement = count_statement.where(condition)
 
 	total = database.session.scalar(count_statement) or 0
+	
 	jobs = database.session.scalars(
 		statement.order_by(JobsMdl.created_at.desc(), JobsMdl.id.desc())
 		.offset((page - 1) * per_page)

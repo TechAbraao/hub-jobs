@@ -44,6 +44,10 @@ class UpdateUserProfileSchema(Schema):
     current_username = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=80))
     current_password = fields.String(load_default=None, allow_none=True, validate=validate.Length(min=3, max=255))
 
+class UpdateUserIsActiveSchema(Schema):
+    class Meta:
+        unknown = RAISE
+    is_active = fields.Boolean(required=True)
 
 def _error(message: str, status: int, details: object | None = None):
     body: dict[str, object] = {"error": message}
@@ -85,6 +89,13 @@ def login_user():
     try:
         data = LoginUserSchema().load(body)
         user = auth_ctr.authenticate_user(data["username"], data["password"])
+
+        # Check if the user is active
+        print(f"User is_active: {user.is_active} and type {type(user.is_active)}")  # Debugging line
+        
+        if user.is_active == "deactivated" or user.is_active == "false":
+            return _error("Usuário inativo. Contate o administrador.", 403)
+
     except ValidationError as error:
         return _error("Dados inválidos.", 400, validation_details(error))
     except auth_ctr.InvalidCredentialsError:
@@ -127,6 +138,9 @@ def list_users():
             "username": user.username,
             "role": user.role,
             "favorite_jobs": [str(job_id) for job_id in favorite_jobs],
+            "is_active": user.is_active,
+            "created_at": user.created_at.isoformat() if user.created_at else None,
+            "updated_at": user.updated_at.isoformat() if user.updated_at else None,
         })
 
     from math import ceil
@@ -177,6 +191,36 @@ def update_user_profile_route(user_id: str):
         return _error("Não foi possível atualizar o usuário.", 500)
 
     return jsonify({"message": "Usuário atualizado com sucesso.", "user": updated.to_dict()}), 200
+
+
+@auth_rts.route("/users/<user_id>/status", methods=["PUT"])
+def update_user_is_active_route(user_id: str):
+    body = _json_body()
+    if body is None:
+        return _error("O corpo da requisição deve ser um objeto JSON.", 400)
+
+    try:
+        parsed_user_id = uuid.UUID(str(user_id))
+    except (ValueError, TypeError):
+        return _error("user_id deve ser um UUID válido.", 400)
+
+    try:
+        data = UpdateUserIsActiveSchema().load(body)
+        updated = auth_ctr.update_user_is_active(
+            parsed_user_id,
+            is_active=data.get("is_active")
+        )
+    except ValidationError as error:
+        return _error("Dados inválidos.", 400, validation_details(error))
+    except auth_ctr.UserNotFoundError:
+        return _error("Usuário não encontrado.", 404)
+    except ValueError as error:
+        return _error(str(error), 400)
+    except Exception:
+        current_app.logger.exception("Failed to update user is_active")
+        return _error("Não foi possível atualizar o status do usuário.", 500)
+
+    return jsonify({"message": "Status do usuário atualizado com sucesso.", "user": updated.to_dict()}), 200
 
 
 @auth_rts.route("/users/<user_id>", methods=["DELETE"])

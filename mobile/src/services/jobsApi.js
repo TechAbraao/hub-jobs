@@ -95,6 +95,7 @@ export async function updateUserProfile(userId, { username, current_username, pa
   if (current_password !== undefined && current_password !== null && current_password !== '') {
     payload.current_password = current_password;
   }
+  // Preciso criar a lógica de desativar usuário aqui.
 
   const response = await request(`/auth/users/${userId}`, {
     method: 'PATCH',

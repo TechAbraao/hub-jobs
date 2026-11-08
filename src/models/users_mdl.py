@@ -13,6 +13,7 @@ class UsersMdl(database.Model):
     password_hash = database.Column(database.String(255), nullable=False)
     role = database.Column(database.String(50), nullable=False, default="user")
     favorite_jobs = database.Column(database.JSON, nullable=False, default=list)
+    is_active = database.Column(database.String(10), nullable=False, default=True)
     created_at = database.Column(database.DateTime, default=database.func.current_timestamp())
     updated_at = database.Column(
         database.DateTime,
@@ -35,4 +36,5 @@ class UsersMdl(database.Model):
             "favorite_jobs": [str(job_id) for job_id in favorite_jobs],
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
+            "is_active": self.is_active
         }

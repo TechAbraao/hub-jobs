@@ -5,7 +5,7 @@ meta {
 }
 
 delete {
-  url: {{baseUrl}}/auth/users
+  url: {{baseUrl}}/auth/users/{{userId}}
   body: json
   auth: none
 }
@@ -15,13 +15,8 @@ headers {
   Content-Type: application/json
 }
 
-body:json {
-  {
-    "username": "{{username}}"
-  }
-}
-
 vars:pre-request {
   username: alice
   baseUrl: http://127.0.0.1:5000
+  userId: caceec7b-d51c-4b06-979a-e9e9a1fd01ba
 }

@@ -1,0 +1,27 @@
+meta {
+  name: Is Active User
+  type: http
+  seq: 7
+}
+
+put {
+  url: {{baseUrl}}/auth/users/{{userId}}/status
+  body: json
+  auth: inherit
+}
+
+body:json {
+  {
+    "is_active": "False"
+  }
+}
+
+vars:pre-request {
+  userId: a77b1526-12b8-4bb3-8b90-429c16ccc626
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
