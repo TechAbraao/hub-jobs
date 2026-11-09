@@ -37,7 +37,7 @@ export default function BottomTabs({ active, onSearch, onFavorites, onAdmin }) {
           Buscar
         </Text>
       </TouchableOpacity>
-
+          
       {hasFavoritesTab ? (
         <TouchableOpacity
           onPress={onFavorites}

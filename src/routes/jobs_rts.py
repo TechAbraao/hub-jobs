@@ -1,6 +1,7 @@
 from math import ceil
 
 from flask import Blueprint, current_app, jsonify, request
+import requests
 from marshmallow import ValidationError
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -10,7 +11,7 @@ from src.schemas.http import JobSchema, JobUpdateSchema, validation_details
 jobs_rts = Blueprint("jobs_rts", __name__, url_prefix="/jobs")
 job_schema = JobSchema()
 job_update_schema = JobUpdateSchema()
-
+GUPY_URL = "https://portal.gupy.io/api/job-search/jobs"
 
 def _error(message: str, status: int, details: object | None = None):
     body: dict[str, object] = {"error": message}
@@ -80,6 +81,28 @@ def get_jobs():
         },
     }), 200
 
+@jobs_rts.route("/gupy", methods=["GET"])
+def gupy_jobs():
+    try:
+        params = {
+            "jobName": request.args.get("jobName") or "desenvolvedor",
+            "limit": min(int(request.args.get("limit", 10)), 50),
+            "offset": max(int(request.args.get("offset", 0)), 0),
+        }
+    except ValueError:
+        return _error("limit e offset devem ser números válidos.", 400)
+
+    city = request.args.get("city")
+    if city:
+        params["city"] = city
+
+    try:
+        r = requests.get(GUPY_URL, params=params, timeout=15)
+    except requests.RequestException:
+        current_app.logger.exception("Failed to reach Gupy")
+        return _error("Não foi possível consultar a Gupy.", 502)
+
+    return r.content, r.status_code, {"Content-Type": "application/json"}
 
 @jobs_rts.route("/<uuid:job_id>", methods=["GET"])
 def get_job(job_id):

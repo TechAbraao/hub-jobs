@@ -25,6 +25,7 @@ import {
   removeFavoriteJob,
   updateUserProfile,
 } from './src/services/jobsApi';
+import { listGupyJobs } from './src/services/gupyApi';
 
 function normalizeJob(job) {
   const title = job?.title || job?.cargo || 'N/A';
@@ -67,6 +68,8 @@ function normalizeJobs(jobs) {
   return (Array.isArray(jobs) ? jobs : []).map(normalizeJob);
 }
 
+const PAGINATION_VAZIA = { total: 0, page: 1, per_page: 10, pages: 0 };
+
 export default function App() {
   const { width } = useWindowDimensions();
   const isTablet = width >= 768;
@@ -81,18 +84,23 @@ export default function App() {
   const [profileError, setProfileError] = useState('');
   const [profileSuccess, setProfileSuccess] = useState('');
   const [tela, setTela] = useState('Welcome');
-  const [vagas, setVagas] = useState([]);
   const [favoritos, setFavoritos] = useState([]);
   const [vagaSelecionada, setVagaSelecionada] = useState(null);
   const [busca, setBusca] = useState('');
   const [categoria, setCategoria] = useState('Todas');
+
+  // Vagas da plataforma (backend)
+  const [vagas, setVagas] = useState([]);
   const [paginaAtual, setPaginaAtual] = useState(1);
-  const [pagination, setPagination] = useState({
-    total: 0,
-    page: 1,
-    per_page: 10,
-    pages: 0,
-  });
+  const [pagination, setPagination] = useState(PAGINATION_VAZIA);
+
+  // Vagas da Gupy (API da Gupy)
+  const [vagasGupy, setVagasGupy] = useState([]);
+  const [paginaGupy, setPaginaGupy] = useState(1);
+  const [paginationGupy, setPaginationGupy] = useState(PAGINATION_VAZIA);
+  const [carregandoGupy, setCarregandoGupy] = useState(false);
+  const [gupyCarregada, setGupyCarregada] = useState(false);
+  const [erroGupy, setErroGupy] = useState('');
 
   const [filtros, setFiltros] = useState({
     modalidade: '',
@@ -109,7 +117,7 @@ export default function App() {
       setProfileNewPassword('');
       setProfileError('');
       setProfileSuccess('');
-      pesquisarNaGupy();
+      pesquisarNaPlataforma();
     }
   }, [session]);
 
@@ -161,7 +169,8 @@ export default function App() {
     }
   }
 
-  async function pesquisarNaGupy(termo = busca, pagina = 1, filtrosAtuais = filtros) {
+  // Requisição para o backend da plataforma (vagas cadastradas)
+  async function pesquisarNaPlataforma(termo = busca, pagina = 1, filtrosAtuais = filtros) {
     if (!session) {
       return;
     }
@@ -188,10 +197,38 @@ export default function App() {
         pages: 1,
       });
     } catch (error) {
-      console.log('Erro na busca:', error.message);
+      console.log('Erro na busca (plataforma):', error.message);
       setVagas([]);
-      setPagination({ total: 0, page: 1, per_page: 10, pages: 0 });
+      setPagination(PAGINATION_VAZIA);
       setPaginaAtual(1);
+    }
+  }
+
+  // Requisição para a API da Gupy (vagas externas)
+  async function pesquisarNaGupy(termo = busca, pagina = 1, filtrosAtuais = filtros) {
+    try {
+      setCarregandoGupy(true);
+      setErroGupy('');
+
+      const response = await listGupyJobs({
+        q: termo,
+        page: pagina,
+        perPage: 10,
+        city: filtrosAtuais?.localizacao || undefined,
+      });
+
+      setVagasGupy(response.jobs);
+      setPaginaGupy(pagina);
+      setPaginationGupy(response.pagination);
+      setGupyCarregada(true);
+    } catch (error) {
+      console.log('Erro na busca (Gupy):', error.message);
+      setVagasGupy([]);
+      setPaginationGupy(PAGINATION_VAZIA);
+      setPaginaGupy(1);
+      setErroGupy('Não foi possível buscar vagas na Gupy agora.');
+    } finally {
+      setCarregandoGupy(false);
     }
   }
 
@@ -296,6 +333,11 @@ export default function App() {
     setAuthError('');
     setTela('Welcome');
     setVagas([]);
+    setVagasGupy([]);
+    setPaginationGupy(PAGINATION_VAZIA);
+    setPaginaGupy(1);
+    setGupyCarregada(false);
+    setErroGupy('');
     setFavoritos([]);
     setVagaSelecionada(null);
     setEditingProfile(false);
@@ -320,42 +362,59 @@ export default function App() {
 
     const canManageFavorites = session.role !== 'admin';
 
+    // Props da Home, montadas uma vez só e reaproveitadas nos três lugares que renderizam a Home
+    const renderHome = (extra = {}) => (
+      <Home
+        // plataforma
+        vagas={vagas}
+        paginaAtual={paginaAtual}
+        pagination={pagination}
+        onPageChange={pagina => pesquisarNaPlataforma(busca, pagina, filtros)}
+        pesquisarNaPlataforma={pesquisarNaPlataforma}
+        // Gupy
+        vagasGupy={vagasGupy}
+        gupyCarregada={gupyCarregada}
+        carregandoGupy={carregandoGupy}
+        erroGupy={erroGupy}
+        paginaGupy={paginaGupy}
+        paginationGupy={paginationGupy}
+        onPageChangeGupy={pagina => pesquisarNaGupy(busca, pagina, filtros)}
+        pesquisarNaGupy={pesquisarNaGupy}
+        // restante
+        busca={busca}
+        setBusca={setBusca}
+        categoria={categoria}
+        setCategoria={setCategoria}
+        favoritos={favoritos}
+        ehFavorita={ehFavorita}
+        alternarFavorito={canManageFavorites ? alternarFavorito : () => {}}
+        abrirDetalhes={abrirDetalhes}
+        abrirFiltros={() => setTela('Filters')}
+        abrirFavoritos={canManageFavorites ? () => setTela('Favorites') : undefined}
+        onOpenAdmin={session.role === 'admin' ? abrirAdmin : null}
+        filtros={filtros}
+        session={session}
+        onLogout={handleLogout}
+        editingProfile={editingProfile}
+        setEditingProfile={setEditingProfile}
+        profileDraft={profileDraft}
+        setProfileDraft={setProfileDraft}
+        profileCurrentPassword={profileCurrentPassword}
+        setProfileCurrentPassword={setProfileCurrentPassword}
+        profileNewPassword={profileNewPassword}
+        setProfileNewPassword={setProfileNewPassword}
+        profileError={profileError}
+        setProfileError={setProfileError}
+        profileSuccess={profileSuccess}
+        setProfileSuccess={setProfileSuccess}
+        onSaveProfile={handleProfileSave}
+        {...extra}
+      />
+    );
+
     switch (tela) {
       case 'Home':
-        return (
-          <Home
-            vagas={vagas}
-            busca={busca}
-            setBusca={setBusca}
-            categoria={categoria}
-            setCategoria={setCategoria}
-            favoritos={favoritos}
-            ehFavorita={ehFavorita}
-            alternarFavorito={canManageFavorites ? alternarFavorito : () => {}}
-            abrirDetalhes={abrirDetalhes}
-            abrirFiltros={() => setTela('Filters')}
-            abrirFavoritos={canManageFavorites ? () => setTela('Favorites') : undefined}
-            onOpenAdmin={session.role === 'admin' ? abrirAdmin : null}
-            pesquisarNaGupy={pesquisarNaGupy}
-            filtros={filtros}
-            session={session}
-            onLogout={handleLogout}
-            editingProfile={editingProfile}
-            setEditingProfile={setEditingProfile}
-            profileDraft={profileDraft}
-            setProfileDraft={setProfileDraft}
-            profileCurrentPassword={profileCurrentPassword}
-            setProfileCurrentPassword={setProfileCurrentPassword}
-            profileNewPassword={profileNewPassword}
-            setProfileNewPassword={setProfileNewPassword}
-            profileError={profileError}
-            profileSuccess={profileSuccess}
-            onSaveProfile={handleProfileSave}
-            paginaAtual={paginaAtual}
-            pagination={pagination}
-            onPageChange={pagina => pesquisarNaGupy(busca, pagina, filtros)}
-          />
-        );
+        return renderHome();
 
       case 'Filters':
         return (
@@ -366,7 +425,10 @@ export default function App() {
               setFiltros(novosFiltros);
               setPaginaAtual(1);
               setTela('Home');
-              pesquisarNaGupy(busca, 1, novosFiltros);
+              pesquisarNaPlataforma(busca, 1, novosFiltros);
+              if (gupyCarregada) {
+                pesquisarNaGupy(busca, 1, novosFiltros);
+              }
             }}
           />
         );
@@ -383,29 +445,7 @@ export default function App() {
 
       case 'Favorites':
         if (!canManageFavorites) {
-          return (
-            <Home
-              vagas={vagas}
-              busca={busca}
-              setBusca={setBusca}
-              categoria={categoria}
-              setCategoria={setCategoria}
-              favoritos={favoritos}
-              ehFavorita={ehFavorita}
-              alternarFavorito={() => {}}
-              abrirDetalhes={abrirDetalhes}
-              abrirFiltros={() => setTela('Filters')}
-              abrirFavoritos={undefined}
-              onOpenAdmin={session.role === 'admin' ? abrirAdmin : null}
-              pesquisarNaGupy={pesquisarNaGupy}
-              filtros={filtros}
-              session={session}
-              onLogout={handleLogout}
-              paginaAtual={paginaAtual}
-              pagination={pagination}
-              onPageChange={pagina => pesquisarNaGupy(busca, pagina, filtros)}
-            />
-          );
+          return renderHome({ alternarFavorito: () => {}, abrirFavoritos: undefined });
         }
 
         return (
@@ -422,24 +462,7 @@ export default function App() {
         return session.role === 'admin' ? (
           <AdminJobs onBack={voltarParaHome} />
         ) : (
-          <Home
-            vagas={vagas}
-            busca={busca}
-            setBusca={setBusca}
-            categoria={categoria}
-            setCategoria={setCategoria}
-            favoritos={favoritos}
-            ehFavorita={ehFavorita}
-            alternarFavorito={canManageFavorites ? alternarFavorito : () => {}}
-            abrirDetalhes={abrirDetalhes}
-            abrirFiltros={() => setTela('Filters')}
-            abrirFavoritos={canManageFavorites ? () => setTela('Favorites') : undefined}
-            onOpenAdmin={null}
-            pesquisarNaGupy={pesquisarNaGupy}
-            filtros={filtros}
-            session={session}
-            onLogout={handleLogout}
-          />
+          renderHome({ onOpenAdmin: null })
         );
 
       default:

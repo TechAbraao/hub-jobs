@@ -1,48 +1,99 @@
+// Consulta as vagas da Gupy passando pelo backend (rota GET /jobs/gupy),
+// porque o navegador bloqueia a chamada direta à Gupy por CORS.
 
-const GUPY_API_URL = '';
+const API_URL = 'http://localhost:5000';
+const GUPY_URL = `${API_URL}/jobs/gupy`;
+const TERMO_PADRAO = 'desenvolvedor';
 
-export async function buscarVagasNaGupy(filtros = {}) {
-  if (!GUPY_API_URL) {
-    console.log('Configure a URL da API da Gupy.');
-    return [];
-  }
+const MODALIDADES = {
+  remote: 'Remoto',
+  hybrid: 'Híbrido',
+  'on-site': 'Presencial',
+};
 
-  const parametros = new URLSearchParams();
+const CONTRATOS = {
+  vacancy_type_effective: 'Efetivo',
+  vacancy_type_internship: 'Estágio',
+  vacancy_type_apprentice: 'Aprendiz',
+  vacancy_type_temporary: 'Temporário',
+  vacancy_type_talent_pool: 'Banco de talentos',
+};
 
-  Object.entries(filtros).forEach(([chave, valor]) => {
-    if (valor) {
-      parametros.append(chave, valor);
-    }
+function limparHtml(html) {
+  return String(html || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// Converte uma vaga da Gupy para o mesmo formato que o normalizeJob() do App.js devolve
+function mapGupyJob(job) {
+  const titulo = job?.name || job?.title || 'N/A';
+  const empresa = job?.careerPageName || job?.companyName || 'N/A';
+  const local = [job?.city, job?.state].filter(Boolean).join(' - ') || (job?.isRemoteWork ? 'Remoto' : 'N/A');
+  const descricao = limparHtml(job?.description) || 'N/A';
+
+  return {
+    id: `gupy-${job?.id ?? `${empresa}-${titulo}`}`,
+    origem: 'gupy',
+    cargo: titulo,
+    empresa,
+    local,
+    modalidade: MODALIDADES[job?.workplaceType] || (job?.isRemoteWork ? 'Remoto' : 'N/A'),
+    categoria: 'N/A',
+    contrato: CONTRATOS[job?.type] || 'N/A',
+    nivel: 'N/A',
+    salario: 'N/A',
+    tempo: job?.publishedDate || 'N/A',
+    descricao,
+    requisitos: ['N/A'],
+    beneficios: 'N/A',
+    link: job?.jobUrl || '',
+    company: empresa,
+    title: titulo,
+    location: local,
+    description: descricao,
+    platform: 'Gupy',
+    salary: null,
+  };
+}
+
+export async function listGupyJobs({ q, page = 1, perPage = 10, city } = {}) {
+  const offset = (page - 1) * perPage;
+
+  const params = new URLSearchParams({
+    jobName: (q || '').trim() || TERMO_PADRAO,
+    limit: String(perPage),
+    offset: String(offset),
   });
 
-  const response = await fetch(
-    `${GUPY_API_URL}?${parametros.toString()}`
-  );
-
-  if (!response.ok) {
-    throw new Error(`Erro HTTP: ${response.status}`);
+  if (city) {
+    params.append('city', city);
   }
 
-  const dados = await response.json();
+  const response = await fetch(`${GUPY_URL}?${params.toString()}`);
 
-  const lista = Array.isArray(dados)
-    ? dados
-    : dados.jobs || dados.results || [];
+  if (!response.ok) {
+    throw new Error(`A Gupy respondeu com erro ${response.status}.`);
+  }
 
-  return lista.map((item, index) => ({
-    id: String(item.id || item.code || index),
-    cargo: item.name || item.title || 'Vaga sem título',
-    empresa: item.companyName || item.company?.name || 'Empresa',
-    local: item.city || item.location || 'Não informado',
-    modalidade: item.workplaceType || 'Remoto',
-    categoria: item.category || 'Todas',
-    contrato: item.contractType || '',
-    nivel: item.seniority || '',
-    salario: item.salary || 'Não informado',
-    tempo: '',
-    descricao: item.description || 'Descrição não informada.',
-    requisitos: item.requirements || [],
-    beneficios: item.benefits || 'Não informado',
-    link: item.applicationUrl || item.url || '',
-  }));
+  const body = await response.json();
+  const lista = Array.isArray(body?.data)
+    ? body.data
+    : Array.isArray(body?.results)
+      ? body.results
+      : [];
+
+  const total = Number(body?.pagination?.total ?? lista.length);
+
+  return {
+    jobs: lista.map(mapGupyJob),
+    pagination: {
+      total,
+      page,
+      per_page: perPage,
+      pages: Math.max(1, Math.ceil(total / perPage)),
+    },
+  };
 }
