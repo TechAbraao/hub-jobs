@@ -11,8 +11,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Platform } from 'react-native';
-import { createJob, deleteJob, deleteUser, listJobs, listUsers, updateJob } from '../services/jobsApi';
-
+import { createJob, deleteJob, deleteUser, listJobs, listUsers, updateJob, updateStatusUserById } from '../services/jobsApi';
+import { Switch } from "react-native";
 
 const EMPTY_FORM = {
   title: '',
@@ -205,6 +205,7 @@ export default function AdminJobs({ onBack }) {
 
   async function handleIsActivedUser(user) {
     const id = user?.id;
+    const userStatus = user?.is_active;
 
     if (id === undefined || id === null || id === '') {
       setError('Não foi possível identificar o usuário para ativação/desativação.');
@@ -221,10 +222,10 @@ export default function AdminJobs({ onBack }) {
     try {
       setError('');
       setSuccess('');
-      await None
+      await updateStatusUserById(id, userStatus);
       setUsers(current => current.filter(item => String(item.id) !== String(id)));
       await loadUsers(userSearch, usersPage);
-      setSuccess('Usuário ativado/desativado com sucesso.');
+      setSuccess(`${user.username} ativado/desativado com sucesso.`);
     } catch (err) {
       console.warn('Erro ao ativar/desativar usuário:', err);
       setError(err.message || 'Não foi possível ativar/desativar o usuário.');
@@ -465,9 +466,13 @@ export default function AdminJobs({ onBack }) {
                 </View>
 
                 <View style={styles.actions}>
-                  <TouchableOpacity onPress={() => handleIsActivedUser(user)} style={styles.iconButton}>
-                    <Ionicons name="checkbox" size={18} color="#1621c2" />
-                  </TouchableOpacity>
+                  <Switch
+                    value={user.is_active == "true"}
+                    onValueChange={() => handleIsActivedUser(user)}
+                    trackColor={{ false: "#d1d5db", true: "#86efac" }}
+                    thumbColor={user.is_active == "true" ? "#16a34a" : "#9ca3af"}
+                    accessibilityLabel={user.is_active == "true" ? "Desativar usuário" : "Ativar usuário"}
+                  />
                 </View>
 
                 <View style={styles.actions}>
@@ -481,7 +486,19 @@ export default function AdminJobs({ onBack }) {
               <Text style={styles.jobText}>Favoritos: {Array.isArray(user.favorite_jobs) ? user.favorite_jobs.length : 0}</Text>
               <Text style={styles.jobText}>ID: {user.id}</Text>
               {/** Adicionar uma personalização se caso for TRUE ou FALSE no status do usuário */}
-              <Text style={styles.jobText}>Status: {user.is_active}</Text>
+              <Text style={styles.jobText}>Status:
+                {user.is_active === "true" ? (
+                  <Text style={{
+                    color: '#16a34a', fontWeight: '700', backgroundColor: '#16a34a4d',
+                    paddingHorizontal: "6px", marginLeft: "3px", borderRadius: "10px"
+                  }}> Ativo</Text>
+                ) : (
+                  <Text style={{
+                    color: '#dc2626', fontWeight: '700', backgroundColor: '#e34c4c56',
+                    paddingHorizontal: "6px", marginLeft: "3px", borderRadius: "10px"
+                  }}> Inativo</Text>
+                )}
+              </Text>
             </View>
           ))}
 

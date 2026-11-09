@@ -105,6 +105,18 @@ export async function updateUserProfile(userId, { username, current_username, pa
   return response?.user ?? null;
 }
 
+export async function updateStatusUserById(userId, currentStatus) {
+  const response = await request(`/auth/users/${userId}/status`, {
+    method: 'PUT',
+    body: {
+      "is_active": currentStatus === "true" ? "False" : "True"
+    }
+  });
+
+  return response ?? null;
+}
+
+
 export async function listUsers(params = {}) {
   const response = await request('/auth/users', { params });
 

@@ -5,8 +5,9 @@ from marshmallow import RAISE, Schema, ValidationError, fields, validate
 
 from src.controllers import auth_ctr
 from src.schemas.http import validation_details
+import logging
 
-
+logging.basicConfig(level=logging.INFO)
 auth_rts = Blueprint("auth_rts", __name__, url_prefix="/auth")
 
 
@@ -90,8 +91,7 @@ def login_user():
         data = LoginUserSchema().load(body)
         user = auth_ctr.authenticate_user(data["username"], data["password"])
 
-        # Check if the user is active
-        print(f"User is_active: {user.is_active} and type {type(user.is_active)}")  # Debugging line
+        # logging.info(f"User is_active: {user.is_active} and type {type(user.is_active)}")
         
         if user.is_active == "deactivated" or user.is_active == "false":
             return _error("Usuário inativo. Contate o administrador.", 403)
