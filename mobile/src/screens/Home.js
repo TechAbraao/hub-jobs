@@ -197,6 +197,20 @@ export default function Home({
 
   const renderGupy = () => (
     <>
+      {/*
+<View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 12 }}>
+  {['Todas', 'Desenvolvedor', 'Tecnologia', 'Dados'].map(item => (
+    <Chip
+      key={item}
+      label={item}
+      selected={categoria === item}
+      onPress={() => None}
+    />
+  ))} 
+</View>
+  */}
+
+
       {carregandoGupy ? (
         <Text style={{ textAlign: 'center', color: '#8792A6', marginTop: 30 }}>
           Buscando vagas na Gupy...

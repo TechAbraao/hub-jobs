@@ -85,7 +85,7 @@ def get_jobs():
 def gupy_jobs():
     try:
         params = {
-            "jobName": request.args.get("jobName") or "desenvolvedor",
+            "jobName": request.args.get("jobName") or "Desenvolvedor",
             "limit": min(int(request.args.get("limit", 10)), 50),
             "offset": max(int(request.args.get("offset", 0)), 0),
         }
