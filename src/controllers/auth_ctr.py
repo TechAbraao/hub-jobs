@@ -154,23 +154,38 @@ def add_favorite_job(username: str, job_id: str) -> UsersMdl:
     # Não da pra ser pelo ID da Gupy, a API não permite, tem que ser pelas ocorrências do nome e verifica se contai o ID!!
     if _is_uuid(job_id) == False:
 
-        req = requests.get(f"{GUPY_URL}?jobName={job_id}")
+        req = requests.get(f"{GUPY_URL}?jobName={job_id}", timeout=15)
         if req.status_code != 200:
             raise ValueError("job not found in api gupy")
-        data_json = req.json()
-        data = data_json.get("data", {})
-        print(data)
-        job_model = JobsMdl(
-            id=str(data.get("id")),
-            title=data.get("title"),
-            company=data.get("careerPageName"),
-            location=data.get("city"),
-            url=data.get("jobUrl"),
-            salary=data.get("salary"),
-            description=data.get("description"),
-        )
-        database.session.add(job_model)
-        database.session.commit()
+            
+        data = req.json().get("data", [])
+
+        match = next((j for j in data if j.get("name") == job_id), None)
+        if match is None:
+            if not data:
+                raise ValueError("job not found in api gupy")
+            match = data[0]
+
+        external_id = str(match["id"])
+        job_model = database.session.execute(
+            select(JobsMdl).where(JobsMdl.external_id == external_id)).scalars().first()
+
+        if job_model is None:
+            job_model = JobsMdl(
+                external_id=external_id,
+                title=match.get("name"),
+                company=match.get("careerPageName"),
+                location=match.get("city"),
+                url=match.get("jobUrl"),
+                salary=match.get("salary"),
+                description=match.get("description"),
+                platform="gupy",
+                modality=match.get("workplaceType"),
+            )
+            database.session.add(job_model)
+            database.session.commit()
+
+        job_id = str(job_model.id) 
 
         favorite_jobs = list(user.favorite_jobs or [])
         if str(job_id) not in favorite_jobs:
