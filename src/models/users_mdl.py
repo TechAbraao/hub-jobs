@@ -8,7 +8,7 @@ from src.utils.settings import database
 class UsersMdl(database.Model):
     __tablename__ = "users"
 
-    id = database.Column(database.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id = database.Column(database.String(200), primary_key=True, default=uuid.uuid4)
     username = database.Column(database.String(80), unique=True, nullable=False, index=True)
     password_hash = database.Column(database.String(255), nullable=False)
     role = database.Column(database.String(50), nullable=False, default="user")

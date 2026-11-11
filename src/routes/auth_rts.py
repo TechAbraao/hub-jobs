@@ -263,19 +263,24 @@ def list_favorites():
 @auth_rts.route("/favorites", methods=["POST", "DELETE"])
 def manage_favorites():
     body = _json_body()
+
     if body is None:
         return _error("O corpo da requisição deve ser um objeto JSON.", 400)
+
     try:
         data = FavoriteSchema().load(body)
-        user_name = data["username"]
-        job_id = uuid.UUID(str(data["job_id"]))
-    except (ValidationError, ValueError) as error:
-        return _error("Dados inválidos.", 400, validation_details(error) if isinstance(error, ValidationError) else {"job_id": ["job_id deve ser um UUID válido."]})
+    except ValidationError as error:
+        return _error("Dados inválidos.", 400, validation_details(error))
+    
+    user_name = data["username"]
+    job_id = data["job_id"]
 
     try:
         if request.method == "POST":
             user = auth_ctr.add_favorite_job(user_name, job_id)
             return jsonify({"message": "Vaga adicionada aos favoritos.", "user": user.to_dict()}), 200
+
+        # Aqui é o fluxo request.method == "DELETE"
         user = auth_ctr.remove_favorite_job(user_name, job_id)
         return jsonify({"message": "Vaga removida dos favoritos.", "user": user.to_dict()}), 200
     except auth_ctr.UserNotFoundError:
