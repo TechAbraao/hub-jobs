@@ -228,7 +228,7 @@ export default function Home({
               vaga={vaga}
               favorita={false}
               onPress={() => abrirDetalhes(vaga)}
-              onFavorite={undefined}
+              onFavorite={canManageFavorites ? () => alternarFavorito(vaga) : undefined} 
             />
           ))}
 

@@ -27,6 +27,8 @@ import {
 } from './src/services/jobsApi';
 import { listGupyJobs } from './src/services/gupyApi';
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 function normalizeJob(job) {
   const title = job?.title || job?.cargo || 'N/A';
   const company = job?.company || job?.empresa || 'N/A';
@@ -231,33 +233,34 @@ export default function App() {
       setCarregandoGupy(false);
     }
   }
+  const isUuid = (value) => UUID_REGEX.test(String(value));
+  const getFavoriteKey = (vaga) => (isUuid(vaga.id) ? String(vaga.id) : vaga.title);
 
   async function alternarFavorito(vaga) {
     if (session?.role === 'admin' || !session?.username || !vaga?.id) {
       return;
     }
 
-    const jaFavorita = favoritos.some(item => item.id === vaga.id);
+    const chave = getFavoriteKey(vaga);
+    const jaFavorita = favoritos.some(item => getFavoriteKey(item) === chave);
 
     try {
       if (jaFavorita) {
-        await removeFavoriteJob(session.username, vaga.id);
-        setFavoritos(atual => atual.filter(item => item.id !== vaga.id));
+        await removeFavoriteJob(session.username, chave);
+        setFavoritos(atual => atual.filter(item => getFavoriteKey(item) !== chave));
         return;
       }
 
-      await addFavoriteJob(session.username, vaga.id);
-      setFavoritos(atual => {
-        if (atual.some(item => item.id === vaga.id)) {
-          return atual;
-        }
-        return [...atual, normalizeJob(vaga)];
-      });
+      await addFavoriteJob(session.username, chave);
+      setFavoritos(atual =>
+        atual.some(item => getFavoriteKey(item) === chave)
+          ? atual
+          : [...atual, normalizeJob(vaga)]
+      );
     } catch (error) {
       console.warn('Não foi possível atualizar favorito:', error.message);
     }
   }
-
   function ehFavorita(vaga) {
     return favoritos.some(item => item.id === vaga.id);
   }
@@ -387,7 +390,7 @@ export default function App() {
         setCategoria={setCategoria}
         favoritos={favoritos}
         ehFavorita={ehFavorita}
-        alternarFavorito={canManageFavorites ? alternarFavorito : () => {}}
+        alternarFavorito={canManageFavorites ? alternarFavorito : () => { }}
         abrirDetalhes={abrirDetalhes}
         abrirFiltros={() => setTela('Filters')}
         abrirFavoritos={canManageFavorites ? () => setTela('Favorites') : undefined}
@@ -445,7 +448,7 @@ export default function App() {
 
       case 'Favorites':
         if (!canManageFavorites) {
-          return renderHome({ alternarFavorito: () => {}, abrirFavoritos: undefined });
+          return renderHome({ alternarFavorito: () => { }, abrirFavoritos: undefined });
         }
 
         return (

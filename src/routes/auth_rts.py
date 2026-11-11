@@ -259,7 +259,6 @@ def list_favorites():
         return _error("Não foi possível consultar os favoritos.", 500)
     return jsonify({"favorite_jobs": [job.to_dict() for job in jobs]}), 200
 
-
 @auth_rts.route("/favorites", methods=["POST", "DELETE"])
 def manage_favorites():
     body = _json_body()
