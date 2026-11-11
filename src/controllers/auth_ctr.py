@@ -212,17 +212,18 @@ def remove_favorite_job(username: str, job_id: str) -> UsersMdl:
         raise UserNotFoundError
     _ensure_user_can_manage_favorites(user)
 
-    if _is_uuid(job_id) == False:
-        favorite_jobs = list(user.favorite_jobs or [])
-        job_id_str = str(job_id)
-        if job_id_str in favorite_jobs:
-            favorite_jobs.remove(job_id_str)
-            user.favorite_jobs = favorite_jobs
-            database.session.commit()
-        return user
+    # if _is_uuid(job_id) == False:
+    #     favorite_jobs = list(user.favorite_jobs or [])
+    #     job_id_str = str(job_id)
+    #     if job_id_str in favorite_jobs:
+    #         favorite_jobs.remove(job_id_str)
+    #         user.favorite_jobs = favorite_jobs
+    #         database.session.commit()
+    #     return user
 
-    if database.session.get(JobsMdl, job_id) is None:
-        raise ValueError("job not found")
+    if not job_id in list(user.favorite_jobs):
+        print("job_id found in favorites")
+        raise ValueError("job not found in favorites")
 
     favorite_jobs = list(user.favorite_jobs or [])
     job_id_str = str(job_id)

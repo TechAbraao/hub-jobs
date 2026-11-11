@@ -154,6 +154,34 @@ def list_users():
         },
     }), 200
 
+# @auth_rts.route("/users/<user_id>", methods=["GET"])
+# def get_user_by_id_route(user_id: str):
+#     try:
+#         parsed_user_id = uuid.UUID(str(user_id))
+#     except ValueError:
+#         return _error("user_id deve ser um UUID válido.", 400)
+
+#     try:
+#         user = auth_ctr.get_user_by_id(parsed_user_id)
+#     except auth_ctr.UserNotFoundError:
+#         return _error("Usuário não encontrado.", 404)
+#     except Exception:
+#         current_app.logger.exception("Failed to get user by ID")
+#         return _error("Não foi possível consultar o usuário.", 500)
+
+#     return jsonify({"user": user.to_dict()}), 200
+
+@auth_rts.route("/users/<username>", methods=["GET"])
+def get_user_by_username_route(username: str):
+    try:
+        user = auth_ctr.get_user_by_username(username)
+    except auth_ctr.UserNotFoundError:
+        return _error("Usuário não encontrado.", 404)
+    except Exception:
+        current_app.logger.exception("Failed to get user by username")
+        return _error("Não foi possível consultar o usuário.", 500)
+
+    return jsonify({"user": user.to_dict()}), 200
 
 @auth_rts.route("/users/<user_id>", methods=["PATCH", "PUT"])
 @auth_rts.route("/users/<user_id>/profile", methods=["PATCH", "PUT"])
@@ -280,7 +308,11 @@ def manage_favorites():
             return jsonify({"message": "Vaga adicionada aos favoritos.", "user": user.to_dict()}), 200
 
         # Aqui é o fluxo request.method == "DELETE"
-        user = auth_ctr.remove_favorite_job(user_name, job_id)
+        try:
+            user = auth_ctr.remove_favorite_job(user_name, job_id)
+        except ValueError as error:
+            return _error(str(error), 404)  
+
         return jsonify({"message": "Vaga removida dos favoritos.", "user": user.to_dict()}), 200
     except auth_ctr.UserNotFoundError:
         return _error("Usuário não encontrado.", 404)
