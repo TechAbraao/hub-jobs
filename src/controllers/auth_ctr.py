@@ -147,28 +147,26 @@ def add_favorite_job(username: str, job_id: str) -> UsersMdl:
 
     if user is None:
         raise UserNotFoundError
-    
+
     _ensure_user_can_manage_favorites(user)
 
-    # Na realidade aqui eu valido na API Pública da GUPY.
-    # Não da pra ser pelo ID da Gupy, a API não permite, tem que ser pelas ocorrências do nome e verifica se contai o ID!!
-    if _is_uuid(job_id) == False:
-
+    if not _is_uuid(job_id):
+        # Valida na API pública da Gupy: não dá para buscar pelo ID da Gupy,
+        # então busca pelo nome e confere nas ocorrências.
         req = requests.get(f"{GUPY_URL}?jobName={job_id}", timeout=15)
         if req.status_code != 200:
             raise ValueError("job not found in api gupy")
-            
-        data = req.json().get("data", [])
 
-        match = next((j for j in data if j.get("name") == job_id), None)
-        if match is None:
-            if not data:
-                raise ValueError("job not found in api gupy")
-            match = data[0]
+        data = req.json().get("data", [])
+        if not data:
+            raise ValueError("job not found in api gupy")
+
+        match = next((j for j in data if j.get("name") == job_id), data[0])
 
         external_id = str(match["id"])
         job_model = database.session.execute(
-            select(JobsMdl).where(JobsMdl.external_id == external_id)).scalars().first()
+            select(JobsMdl).where(JobsMdl.external_id == external_id)
+        ).scalars().first()
 
         if job_model is None:
             job_model = JobsMdl(
@@ -185,24 +183,19 @@ def add_favorite_job(username: str, job_id: str) -> UsersMdl:
             database.session.add(job_model)
             database.session.commit()
 
-        job_id = str(job_model.id) 
+        job_uuid = job_model.id
+    else:
+        job_uuid = uuid.UUID(str(job_id))
+        if database.session.get(JobsMdl, job_uuid) is None:
+            raise ValueError("job not found")
 
-        favorite_jobs = list(user.favorite_jobs or [])
-        if str(job_id) not in favorite_jobs:
-            favorite_jobs.append(str(job_id))
-            user.favorite_jobs = favorite_jobs
-            database.session.commit()
-        return user
-
-    if database.session.get(JobsMdl, job_id) is None:
-        raise ValueError("job not found")
-
+    job_str = str(job_uuid)
     favorite_jobs = list(user.favorite_jobs or [])
-    if str(job_id) not in favorite_jobs:
-        favorite_jobs.append(str(job_id))
+    if job_str not in favorite_jobs:
+        favorite_jobs.append(job_str)
         user.favorite_jobs = favorite_jobs
         database.session.commit()
-        
+
     return user
 
 
