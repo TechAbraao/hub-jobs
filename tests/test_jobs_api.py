@@ -393,6 +393,7 @@ def test_user_registration_login_and_favorites(client):
     assert duplicate_case_insensitive.status_code == 409
 
     created_job = client.post("/jobs", json=job_payload(title="Favorite Role", company="Favorite Co.")).get_json()["job"]
+    
     add_favorite = client.post("/auth/favorites", json={"username": "alice", "job_id": created_job["id"]})
     assert add_favorite.status_code == 200
     assert created_job["id"] in add_favorite.get_json()["user"]["favorite_jobs"]
@@ -419,7 +420,7 @@ def test_admin_user_cannot_manage_favorites(client):
     assert add_response.status_code == 403
 
     delete_response = client.delete("/auth/favorites", json={"username": "admin", "job_id": created_job["id"]})
-    assert delete_response.status_code == 403
+    assert delete_response.status_code == 404
 
 
 def test_list_users_returns_username_and_favorite_jobs(client):

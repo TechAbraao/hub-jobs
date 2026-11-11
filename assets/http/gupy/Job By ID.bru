@@ -1,0 +1,21 @@
+meta {
+  name: Job By ID
+  type: http
+  seq: 2
+}
+
+get {
+  url: https://portal.gupy.io/api/job-search/jobs?code=12861287
+  body: none
+  auth: inherit
+}
+
+params:query {
+  code: 12861287
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}

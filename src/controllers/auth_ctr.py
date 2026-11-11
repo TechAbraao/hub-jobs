@@ -2,9 +2,10 @@ import uuid
 
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
-
+from src.routes.jobs_rts import GUPY_URL
 from src.models.jobs_mdl import JobsMdl
 from src.models.users_mdl import UsersMdl
+import requests
 from src.utils.settings import database
 
 
@@ -134,30 +135,88 @@ def _ensure_user_can_manage_favorites(user: UsersMdl) -> None:
     if user.role == "admin":
         raise ValueError("Administradores não possuem lista de favoritos.")
 
+def _is_uuid(value: str) -> bool:
+    try:
+        uuid.UUID(value)
+        return True
+    except ValueError:
+        return False
 
-def add_favorite_job(username: str, job_id: uuid.UUID) -> UsersMdl:
+def add_favorite_job(username: str, job_id: str) -> UsersMdl:
     user = get_user_by_username(username)
+
     if user is None:
         raise UserNotFoundError
-    _ensure_user_can_manage_favorites(user)
-    if database.session.get(JobsMdl, job_id) is None:
-        raise ValueError("job not found")
 
+    _ensure_user_can_manage_favorites(user)
+
+    if not _is_uuid(job_id):
+        # Valida na API pública da Gupy: não dá para buscar pelo ID da Gupy,
+        # então busca pelo nome e confere nas ocorrências.
+        req = requests.get(f"{GUPY_URL}?jobName={job_id}", timeout=15)
+        if req.status_code != 200:
+            raise ValueError("job not found in api gupy")
+
+        data = req.json().get("data", [])
+        if not data:
+            raise ValueError("job not found in api gupy")
+
+        match = next((j for j in data if j.get("name") == job_id), data[0])
+
+        external_id = str(match["id"])
+        job_model = database.session.execute(
+            select(JobsMdl).where(JobsMdl.external_id == external_id)
+        ).scalars().first()
+
+        if job_model is None:
+            job_model = JobsMdl(
+                external_id=external_id,
+                title=match.get("name"),
+                company=match.get("careerPageName"),
+                location=match.get("city"),
+                url=match.get("jobUrl"),
+                salary=match.get("salary"),
+                description=match.get("description"),
+                platform="gupy",
+                modality=match.get("workplaceType"),
+            )
+            database.session.add(job_model)
+            database.session.commit()
+
+        job_uuid = job_model.id
+    else:
+        job_uuid = uuid.UUID(str(job_id))
+        if database.session.get(JobsMdl, job_uuid) is None:
+            raise ValueError("job not found")
+
+    job_str = str(job_uuid)
     favorite_jobs = list(user.favorite_jobs or [])
-    if str(job_id) not in favorite_jobs:
-        favorite_jobs.append(str(job_id))
+    if job_str not in favorite_jobs:
+        favorite_jobs.append(job_str)
         user.favorite_jobs = favorite_jobs
         database.session.commit()
+
     return user
 
 
-def remove_favorite_job(username: str, job_id: uuid.UUID) -> UsersMdl:
+def remove_favorite_job(username: str, job_id: str) -> UsersMdl:
     user = get_user_by_username(username)
     if user is None:
         raise UserNotFoundError
     _ensure_user_can_manage_favorites(user)
-    if database.session.get(JobsMdl, job_id) is None:
-        raise ValueError("job not found")
+
+    # if _is_uuid(job_id) == False:
+    #     favorite_jobs = list(user.favorite_jobs or [])
+    #     job_id_str = str(job_id)
+    #     if job_id_str in favorite_jobs:
+    #         favorite_jobs.remove(job_id_str)
+    #         user.favorite_jobs = favorite_jobs
+    #         database.session.commit()
+    #     return user
+
+    if not job_id in list(user.favorite_jobs):
+        print("job_id found in favorites")
+        raise ValueError("job not found in favorites")
 
     favorite_jobs = list(user.favorite_jobs or [])
     job_id_str = str(job_id)

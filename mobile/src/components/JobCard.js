@@ -54,7 +54,7 @@ export default function JobCard({
             <Ionicons
               name={favorita ? 'heart' : 'heart-outline'}
               size={21}
-              color={favorita ? BLUE : '#8491A7'}
+              color={favorita ? BLUE : '#2e66c6'}
             />
           </TouchableOpacity>
         ) : null}

@@ -15,6 +15,7 @@ class JobsMdl(db.Model):
     )
 
     id = db.Column(db.Uuid(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    external_id = db.Column(db.String(255), nullable=True, unique=True)
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False)
     company = db.Column(db.String(255), nullable=False)
@@ -35,6 +36,7 @@ class JobsMdl(db.Model):
     def to_dict(self) -> dict[str, object]:
         return {
             "id": str(self.id),
+            "external_id": self.external_id,
             "title": self.title,
             "description": self.description,
             "company": self.company,

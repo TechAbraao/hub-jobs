@@ -1,0 +1,21 @@
+meta {
+  name: Get User By UUID
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{baseUrl}}/auth/users/{{userID}}
+  body: none
+  auth: inherit
+}
+
+vars:pre-request {
+  userID: sadsadasds
+}
+
+settings {
+  encodeUrl: true
+  timeout: 0
+  forwardAuthorizationHeader: false
+}
